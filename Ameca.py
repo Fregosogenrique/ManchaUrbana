@@ -1,85 +1,44 @@
-import os
-from landsatxplore.earthexplorer import EarthExplorer
-from landsatxplore.api import API
+import rasterio
+import numpy as np
+import matplotlib.pyplot as plt
 
-# Configuración de credenciales de USGS
-USGS_USERNAME = "tu_usuario"  # Reemplaza con tu usuario de USGS
-USGS_PASSWORD = "tu_contraseña"  # Reemplaza con tu contraseña de USGS
+def calculate_ndbi(image_path):
+    with rasterio.open(image_path) as src:
+        nir_band = src.read(5).astype('float32')  # Banda SWIR (ejemplo: Landsat 5 TM Banda 5 o Landsat 8 Banda 6)
+        swir_band = src.read(6).astype('float32')  # Banda NIR (ejemplo: Landsat 5 TM Banda 4 o Landsat 8 Banda 5)
 
-# Configuración de la ubicación de Ameca, Jalisco, México
-LATITUDE = 20.55  # Latitud de Ameca
-LONGITUDE = -104.04  # Longitud de Ameca
+        ndbi = (swir_band - nir_band) / (swir_band + nir_band + 1e-10)  # Cálculo de NDBI
+        return ndbi
 
-# Configuración del dataset de Landsat
-DATASET = "landsat_tm_c2_l2"  # Landsat 5 TM (1984-2012)
+def plot_comparison(ndbi1, ndbi2, title1, title2):
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
+    # Mapa de NDBI para la primera década
+    im1 = axes[0].imshow(ndbi1, cmap='RdYlBu')
+    axes[0].set_title(title1)
+    plt.colorbar(im1, ax=axes[0])
 
-# Para Landsat 8, usa "landsat_ot_c2_l2"
+    # Mapa de NDBI para la segunda década
+    im2 = axes[1].imshow(ndbi2, cmap='RdYlBu')
+    axes[1].set_title(title2)
+    plt.colorbar(im2, ax=axes[1])
 
-# Función para descargar imágenes por década
-def descargar_imagenes_decada(decada, output_dir="images"):
-    """
-    Descarga imágenes de Landsat para una década específica.
+    # Cálculo de la diferencia y el porcentaje de cambio
+    difference = ndbi2 - ndbi1
+    percentage_change = (difference / (ndbi1 + 1e-10)) * 100  # Evitar división por cero
 
-    Parámetros:
-        decada (str): Década en formato '1980', '1990', etc.
-        output_dir (str): Directorio de salida para las imágenes.
-    """
-    # Crear directorio de salida si no existe
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # Mapa de diferencias con porcentaje de cambio
+    im_diff = axes[2].imshow(percentage_change, cmap='bwr', vmin=-100, vmax=100)
+    axes[2].set_title("Cambio porcentual de NDBI (%)")
+    plt.colorbar(im_diff, ax=axes[2])
 
-    # Iniciar sesión en USGS Earth Explorer
-    api = API(USGS_USERNAME, USGS_PASSWORD)
-    ee = EarthExplorer(USGS_USERNAME, USGS_PASSWORD)
+    plt.show()
 
-    # Definir rango de fechas para la década
-    start_date = f"{decada}-01-01"
-    end_date = f"{int(decada) + 9}-12-31"
+# Rutas de las imágenes por década
+image_path_1 = "landsat_ameca/ameca_1987.tif"  # Reemplazar con la imagen de la primera década
+image_path_2 = "landsat_ameca/ameca_2006.tif"  # Reemplazar con la imagen de la segunda década
 
-    # Buscar escenas disponibles
-    print(f"Buscando imágenes para la década {decada}...")
-    scenes = api.search(
-        dataset=DATASET,
-        latitude=LATITUDE,
-        longitude=LONGITUDE,
-        start_date=start_date,
-        end_date=end_date,
-        max_cloud_cover=10  # Máximo 10% de nubosidad
-    )
+ndbi_1980 = calculate_ndbi(image_path_1)
+ndbi_2020 = calculate_ndbi(image_path_2)
 
-    # Descargar cada escena
-    for scene in scenes:
-        scene_id = scene["entityId"]
-        year = scene["acquisitionDate"].split("-")[0]  # Extraer el año
-        scene_dir = os.path.join(output_dir, year)
-
-        # Crear directorio para el año si no existe
-        if not os.path.exists(scene_dir):
-            os.makedirs(scene_dir)
-
-        # Descargar la escena
-        print(f"Descargando {scene_id} ({year})...")
-        try:
-            ee.download(scene_id, output_dir=scene_dir)
-        except Exception as e:
-            print(f"Error al descargar {scene_id}: {e}")
-
-    # Cerrar sesión
-    api.logout()
-    ee.logout()
-    print(f"Descarga de la década {decada} completada.")
-
-
-# Función principal
-def main():
-    # Definir las décadas a descargar
-    decadas = ["1980", "1990", "2000", "2010"]
-
-    # Descargar imágenes para cada década
-    for decada in decadas:
-        descargar_imagenes_decada(decada)
-
-
-if __name__ == "__main__":
-    main()
+plot_comparison(ndbi_1980, ndbi_2020, "NDBI 1980", "NDBI 2020")

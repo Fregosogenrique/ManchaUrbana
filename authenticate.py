@@ -7,7 +7,7 @@ ee.Initialize(project='proyectocuvallesmanchau25')
 roi = ee.Geometry.Point([-104.0453, 20.5464]).buffer(5000)
 
 # Definir los años de interés
-decades = [1987, 1994, 2004, 2014, 2020]
+decades = [1987, 1994, 2006, 2013, 2024]
 
 
 # Función para obtener la imagen representativa de cada década
@@ -15,7 +15,7 @@ def get_landsat_image(year):
     start_date = f"{year}-01-01"
     end_date = f"{year + 9}-12-31"
 
-    collection = (ee.ImageCollection("LANDSAT/LT05/C01/T1_SR")
+    collection = (ee.ImageCollection("LANDSAT/LT05/C02/T1_L2")
                   .filterBounds(roi)
                   .filterDate(start_date, end_date)
                   .median()
